@@ -39,6 +39,7 @@
     themeToggle: $("#theme-toggle"),
     themeColorMeta: $("#theme-color-meta"),
     installBtn: $("#install-btn"),
+    notifBtn: $("#notif-btn"),
     prevDay: $("#prev-day"),
     nextDay: $("#next-day"),
     todayBtn: $("#today-btn"),
@@ -131,6 +132,9 @@
       attachListeners();
       Notifications.initFCM(firebase, db, currentUser);
     }
+    // Arranca el ticker de recordatorios (revisa cada 30s los eventos de hoy).
+    Notifications.start(getTodaysEvents, currentUser);
+    updateNotifBanner();
     renderDate();
     renderEvents();
   }
@@ -407,24 +411,42 @@
   // ==================================================================
   //  Notificaciones
   // ==================================================================
-  async function scheduleTodayNotifications() {
-    if (!Notifications.supported()) return;
-    if (Notification.permission !== "granted") return;
-    // Eventos de HOY (puntuales o recurrentes que caen hoy)
+  // Eventos de HOY (puntuales o recurrentes que caen hoy). El ticker de
+  // Notifications llama a esta función en cada revisión.
+  function getTodaysEvents() {
     const today = new Date();
     const iso = isoDate(today);
     const wd = today.getDay();
-    const todays = events.filter((e) =>
+    return events.filter((e) =>
       (e.type === "weekly" && Number(e.weekday) === wd) ||
       (e.type !== "weekly" && e.date === iso)
     );
-    Notifications.scheduleForDay(todays, currentUser);
+  }
+
+  function scheduleTodayNotifications() {
+    if (!Notifications.supported()) return;
+    Notifications.refresh();
+  }
+
+  // Muestra u oculta el botón "Activar recordatorios" según el permiso.
+  function updateNotifBanner() {
+    if (!el.notifBtn) return;
+    const show = Notifications.supported() && Notification.permission === "default";
+    el.notifBtn.classList.toggle("hidden", !show);
   }
 
   async function ensureNotificationPermission() {
+    const before = Notifications.supported() ? Notification.permission : "unsupported";
     const res = await Notifications.requestPermission();
+    updateNotifBanner();
     if (res === "granted") {
-      scheduleTodayNotifications();
+      Notifications.refresh();
+      // Confirmación solo cuando recién se concede (no en cada clic).
+      if (before === "default") {
+        Notifications.notify("🔔 Recordatorios activados", "Te avisaremos a la hora de cada actividad.");
+      }
+    } else if (res === "denied" && before === "default") {
+      toast("Bloqueaste las notificaciones. Activalas en los ajustes del navegador.");
     }
   }
 
@@ -473,6 +495,7 @@
       showOnboarding();
     };
     el.themeToggle.onclick = toggleTheme;
+    el.notifBtn.onclick = ensureNotificationPermission;
 
     // Modal
     el.form.onsubmit = saveEvent;

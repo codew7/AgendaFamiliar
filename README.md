@@ -107,12 +107,26 @@ Requisitos: servida por **HTTPS** (no sirve `file://` ni `http://IP` local).
 
 ## Notificaciones
 
-Actualmente son **notificaciones locales**: mientras la app estuvo abierta, programa un
-aviso para cada actividad de hoy que todavía no pasó. Al abrir la app se re-programan.
+Son **notificaciones locales**. Un "ticker" revisa cada 30 segundos los eventos de hoy
+y dispara el aviso cuando llega la hora (con 2 min de margen por si la pestaña estuvo
+suspendida). No repite un aviso ya mostrado (anti-duplicados guardado en `localStorage`).
 
-**Limitación:** si el sistema mata la PWA en segundo plano, el aviso puede no dispararse
-a la hora exacta. Para notificaciones 100 % confiables con la app cerrada hay que
-activar **FCM (push real)**.
+**Cómo activarlas:**
+1. Instalá la app como PWA (recomendado) y abrila.
+2. Tocá el botón **"🔔 Activar recordatorios"** (aparece arriba si el permiso no fue
+   decidido) o simplemente creá una actividad: la app pedirá permiso de notificaciones.
+3. Aceptá el permiso. Verás una notificación de confirmación.
+
+**Limitaciones (por eso "locales"):**
+- Solo se disparan si la app/PWA está **abierta o activa en segundo plano**. Si el
+  sistema la cierra por completo, ningún JS corre y el aviso no salta a esa hora.
+- Andan mejor con la app **instalada** que en una pestaña del navegador.
+- En **iOS** el permiso de notificaciones web requiere **iOS 16.4+** y la app
+  **instalada** en la pantalla de inicio.
+
+Para avisos 100 % confiables con la app **totalmente cerrada** hace falta **FCM
+(push real)** + una Cloud Function programada (requiere plan Blaze). El código ya está
+preparado; ver abajo.
 
 ### Activar FCM push real (opcional, más adelante)
 Todo el código ya está preparado. Pasos:
