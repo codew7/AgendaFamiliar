@@ -55,7 +55,8 @@
     fId: $("#event-id"),
     fDesc: $("#f-desc"),
     fDate: $("#f-date"),
-    fTime: $("#f-time"),
+    fHour: $("#f-hour"),
+    fMin: $("#f-min"),
     fFor: $("#f-for"),
     deleteBtn: $("#delete-event"),
     // mensajes
@@ -219,13 +220,57 @@
   // ==================================================================
   let modalForWho = null;
 
+  // Llena los desplegables de hora (00–23) y minutos (00,05,…,55), 24 hs.
+  function populateTimeSelects() {
+    el.fHour.innerHTML = "";
+    for (let h = 0; h < 24; h++) {
+      const o = document.createElement("option");
+      o.value = pad(h);
+      o.textContent = pad(h);
+      el.fHour.appendChild(o);
+    }
+    el.fMin.innerHTML = "";
+    for (let m = 0; m < 60; m += 5) {
+      const o = document.createElement("option");
+      o.value = pad(m);
+      o.textContent = pad(m);
+      el.fMin.appendChild(o);
+    }
+  }
+
+  // Agrega una opción puntual si no existe (para minutos no múltiplos de 5 al editar).
+  function ensureOption(select, val) {
+    if (![...select.options].some((o) => o.value === val)) {
+      const o = document.createElement("option");
+      o.value = val;
+      o.textContent = val;
+      select.appendChild(o);
+    }
+  }
+
+  // Fija la hora en los desplegables. Sin valor: hora actual (min a múltiplo de 5).
+  function setModalTime(hhmm) {
+    let h, m;
+    if (hhmm && /^\d{1,2}:\d{2}$/.test(hhmm)) {
+      [h, m] = hhmm.split(":").map(Number);
+    } else {
+      const now = new Date();
+      h = now.getHours();
+      m = Math.round(now.getMinutes() / 5) * 5;
+      if (m === 60) { m = 0; h = (h + 1) % 24; }
+    }
+    ensureOption(el.fMin, pad(m));
+    el.fHour.value = pad(h);
+    el.fMin.value = pad(m);
+  }
+
   function openModal(ev) {
     el.modal.classList.remove("hidden");
     if (ev) {
       el.modalTitle.textContent = "Editar actividad";
       el.fId.value = ev.id;
       el.fDesc.value = ev.desc || "";
-      el.fTime.value = ev.time || "";
+      setModalTime(ev.time);
       el.fDate.value = ev.type === "weekly" ? isoDate(nextWeekdayDate(ev.weekday)) : (ev.date || isoDate(selectedDate));
       setModalFor(ev.forWho || currentUser);
       setRepeat(ev.type === "weekly");
@@ -235,6 +280,7 @@
       el.form.reset();
       el.fId.value = "";
       el.fDate.value = isoDate(selectedDate);
+      setModalTime(null);
       setModalFor(currentUser);
       setRepeat(false);
       el.deleteBtn.classList.add("hidden");
@@ -274,7 +320,7 @@
     if (!firebaseReady) { toast("Configurá Firebase primero"); return; }
 
     const desc = el.fDesc.value.trim();
-    const time = el.fTime.value;
+    const time = el.fHour.value && el.fMin.value ? `${el.fHour.value}:${el.fMin.value}` : "";
     const dateVal = el.fDate.value;
     if (!desc || !time || !dateVal || !modalForWho) {
       toast("Completá todos los campos");
@@ -441,6 +487,8 @@
     updateNotifBanner();
     if (res === "granted") {
       Notifications.refresh();
+      // Registra el token de push (FCM) para recibir avisos con la app cerrada.
+      if (firebaseReady) Notifications.initFCM(firebase, db, currentUser);
       // Confirmación solo cuando recién se concede (no en cada clic).
       if (before === "default") {
         Notifications.notify("🔔 Recordatorios activados", "Te avisaremos a la hora de cada actividad.");
@@ -498,6 +546,7 @@
     el.notifBtn.onclick = ensureNotificationPermission;
 
     // Modal
+    populateTimeSelects();
     el.form.onsubmit = saveEvent;
     el.deleteBtn.onclick = deleteEvent;
     el.modal.querySelectorAll("[data-close]").forEach((n) => (n.onclick = closeModal));

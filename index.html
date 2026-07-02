@@ -76,6 +76,7 @@
       </header>
 
       <button id="install-btn" class="install-btn hidden">📲 Instalar AgendaFamiliar</button>
+      <button id="notif-btn" class="notif-btn hidden">🔔 Activar recordatorios</button>
 
       <section class="events-wrap">
         <ul id="events-list" class="events-list"></ul>
@@ -131,15 +132,19 @@
           <input id="f-desc" type="text" placeholder="Ej: Retirar a Luján" required maxlength="120" />
         </label>
 
-        <div class="field-row">
-          <label class="field">
-            <span>Día</span>
-            <input id="f-date" type="date" required />
-          </label>
-          <label class="field">
-            <span>Hora</span>
-            <input id="f-time" type="time" required />
-          </label>
+        <label class="field">
+          <span>Día</span>
+          <input id="f-date" type="date" required />
+        </label>
+
+        <div class="field">
+          <span>Hora (24 hs)</span>
+          <div class="time-select">
+            <select id="f-hour" aria-label="Hora" required></select>
+            <span class="time-colon">:</span>
+            <select id="f-min" aria-label="Minutos" required></select>
+            <span class="time-suffix">hs</span>
+          </div>
         </div>
 
         <div class="field">
@@ -174,6 +179,7 @@
   <!-- Firebase SDK (compat, sin build) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 
   <script src="firebase-config.js"></script>
   <script src="notifications.js"></script>

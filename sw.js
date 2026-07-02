@@ -5,7 +5,7 @@
  *  - Listener de push (stub) listo para FCM
  * ================================================================== */
 
-const CACHE = "agenda-v3";
+const CACHE = "agenda-v6";
 const SHELL = [
   "./",
   "index.html",

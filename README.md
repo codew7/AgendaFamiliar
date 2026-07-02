@@ -124,37 +124,65 @@ suspendida). No repite un aviso ya mostrado (anti-duplicados guardado en `localS
 - En **iOS** el permiso de notificaciones web requiere **iOS 16.4+** y la app
   **instalada** en la pantalla de inicio.
 
-Para avisos 100 % confiables con la app **totalmente cerrada** hace falta **FCM
-(push real)** + una Cloud Function programada (requiere plan Blaze). El código ya está
-preparado; ver abajo.
+Para avisos 100 % confiables con la app **totalmente cerrada** está el **push real con
+FCM** (ver abajo). Las locales quedan igual como respaldo cuando la app está abierta.
 
-### Activar FCM push real (opcional, más adelante)
-Todo el código ya está preparado. Pasos:
+---
 
-1. En Firebase → **Cloud Messaging**, generá la **clave web push (VAPID)** y pegala en
-   `firebase-config.js` → `FCM_VAPID_KEY`.
-2. En `index.html`, agregá el SDK de messaging después de los otros:
-   ```html
-   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+## 6. Notificaciones push reales (FCM) — con la app cerrada
+
+Ya está **todo el código implementado** (cliente + servidor). Componentes:
+- `firebase-messaging-sw.js` — recibe el push en segundo plano.
+- `initFCM()` en `notifications.js` — registra el token de cada dispositivo en
+  `users/{nombre}/tokens/{token}`.
+- `functions/index.js` — Cloud Function programada que corre **cada minuto**, revisa los
+  eventos cuya hora coincide (en horario de **Argentina**) y envía el push al destinatario.
+
+### Requisito: plan Blaze
+Cloud Functions + Cloud Scheduler necesitan el **plan Blaze** (pago por uso). Para 2
+usuarios el consumo entra en la **capa gratuita** → costo prácticamente **$0**, pero
+Firebase pide una tarjeta igual. Activalo en: consola → ⚙ → *Uso y facturación* → *Blaze*.
+
+### Pasos para activarlo
+1. **VAPID key:** consola de Firebase → ⚙ *Configuración del proyecto* → **Cloud
+   Messaging** → *Certificados push web* → **Generar par de claves** → copiá la clave y
+   pegala en `firebase-config.js` → `FCM_VAPID_KEY`.
+2. **Instalá dependencias de las functions** (una sola vez):
+   ```bash
+   cd functions && npm install && cd ..
    ```
-3. Creá `firebase-messaging-sw.js` en la raíz (SW dedicado de FCM).
-4. Descomentá el cuerpo de `initFCM()` en `notifications.js`.
-5. El token se guarda en `users/{nombre}/fcmToken`.
-6. Creá una **Cloud Function programada** (Blaze) que recorra `events` y envíe el push
-   al token del destinatario a la hora del evento.
+3. **Desplegá** reglas de la base, hosting y la función:
+   ```bash
+   firebase deploy
+   ```
+   La primera vez, el CLI te pedirá **habilitar APIs** (Cloud Functions, Cloud Scheduler,
+   Cloud Build, Artifact Registry) — aceptá.
+4. En el celu, abrí la app **instalada**, tocá **"🔔 Activar recordatorios"** y **aceptá**
+   el permiso. Eso registra el token de push de ese dispositivo.
+5. Listo. Creá un evento a 1–2 minutos para probar y **cerrá la app**: debería llegar la
+   notificación igual.
+
+### Notas
+- La función usa la zona horaria `America/Argentina/Buenos_Aires` (editable en
+  `functions/index.js`, constante `TZ`).
+- Cada dispositivo guarda su propio token; si instalás la app en varios, llegan a todos.
+- **iOS:** el push web funciona solo en **iOS 16.4+** y con la app **instalada** en la
+  pantalla de inicio.
+- Los tokens inválidos se limpian solos cuando la función detecta que ya no aplican.
 
 ---
 
 ## Estructura de datos (Realtime Database)
 
 ```
-users/{Vani|Ale}   -> { name, lastSeen, fcmToken? }
-events/{id}        -> { desc, time:"HH:MM", forWho, createdBy,
-                        type:"once"|"weekly",
-                        date:"YYYY-MM-DD" | null,   // si once
-                        weekday:0-6 | null,         // si weekly (0=Dom)
-                        createdAt }
-messages/{id}      -> { from, text, ts }
+users/{Vani|Ale}     -> { name, lastSeen, tokens: { <fcmToken>: ts } }
+events/{id}          -> { desc, time:"HH:MM", forWho, createdBy,
+                          type:"once"|"weekly",
+                          date:"YYYY-MM-DD" | null,   // si once
+                          weekday:0-6 | null,         // si weekly (0=Dom)
+                          createdAt }
+messages/{id}        -> { from, text, ts }
+notified/{date}/{id} -> true   // interno: anti-duplicados del push (lo maneja la función)
 ```
 
 ## Archivos
@@ -164,8 +192,12 @@ messages/{id}      -> { from, text, ts }
 | `index.html` | Estructura de la app |
 | `styles.css` | Estilos (mobile-first) |
 | `app.js` | Lógica: usuarios, eventos, chat, navegación |
-| `notifications.js` | Notificaciones locales + stub FCM |
-| `firebase-config.js` | **Tus credenciales de Firebase** |
+| `notifications.js` | Notificaciones locales + FCM (token, primer plano) |
+| `firebase-config.js` | **Tus credenciales de Firebase** + VAPID key |
 | `sw.js` | Service Worker (offline + notificaciones) |
+| `firebase-messaging-sw.js` | Service Worker de FCM (push en segundo plano) |
 | `manifest.json` | Metadatos PWA |
 | `icon.png` | **Ícono de la app** (reemplazá por el tuyo) |
+| `functions/index.js` | Cloud Function: envía los push a la hora del evento |
+| `firebase.json` / `.firebaserc` | Config de deploy (hosting + functions + reglas) |
+| `database.rules.json` | Reglas de la Realtime Database |

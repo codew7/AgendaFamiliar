@@ -19,11 +19,14 @@ const firebaseConfig = {
   appId: "1:284635242942:web:c913054e6783af0528d9ef",
 };
 
-/* Para notificaciones push reales con FCM (opcional, más adelante):
- * pegá acá la "clave de par de claves web" (VAPID key) desde
- * Configuración del proyecto → Cloud Messaging → Certificados push web.  */
-const FCM_VAPID_KEY = "";
+/* NOTIFICACIONES PUSH (FCM) — PEGÁ TU VAPID KEY ACÁ.
+ * Consola de Firebase → ⚙ Configuración del proyecto → Cloud Messaging →
+ * "Certificados push web" → Generar par de claves → copiá la clave.
+ * Sin esto, la app usa solo notificaciones locales.                        */
+const FCM_VAPID_KEY = "JgNotcd-2GkIlNTZmrokfAzNgojAYFRINvwNlEcUdBE";
 
 // No tocar debajo de esta línea -------------------------------------
-window.__FIREBASE_CONFIG__ = firebaseConfig;
-window.__FCM_VAPID_KEY__ = FCM_VAPID_KEY;
+// Usamos "self" para que este archivo funcione tanto en la página (window)
+// como dentro del Service Worker de mensajería (firebase-messaging-sw.js).
+self.__FIREBASE_CONFIG__ = firebaseConfig;
+self.__FCM_VAPID_KEY__ = FCM_VAPID_KEY;

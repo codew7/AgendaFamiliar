@@ -1,21 +1,50 @@
 /* ==================================================================
  *  notifications.js — Notificaciones locales (Notification API + SW)
  *  ------------------------------------------------------------------
- *  Estrategia actual: mientras la app está abierta (o fue abierta hace
- *  poco), programamos un setTimeout por cada evento de HOY que todavía
- *  no pasó y disparamos la notificación vía el Service Worker.
+ *  Estrategia: un "ticker" revisa cada 30s los eventos de HOY y dispara
+ *  la notificación cuando llega la hora (con margen de 2 min). Es más
+ *  robusto que un setTimeout largo, porque los timers largos se cancelan
+ *  cuando el sistema suspende la pestaña en segundo plano; en cambio, al
+ *  volver a estar activa la pestaña, el ticker vuelve a revisar y dispara.
  *
- *  Limitación conocida: si el móvil mata la pestaña/PWA en segundo
- *  plano, los timers no sobreviven y la notificación puede no dispararse
- *  a la hora exacta. Para notificaciones 100% confiables con la app
- *  cerrada hay que activar FCM (ver initFCM() más abajo y el README).
+ *  Anti-duplicados: guardamos en localStorage qué avisos ya se mostraron
+ *  hoy (por evento + hora), así no se repiten aunque recargues.
+ *
+ *  Limitación conocida: si el móvil mantiene la PWA totalmente cerrada a
+ *  la hora del evento, ningún JS corre y el aviso no se dispara. Para eso
+ *  hace falta FCM (ver initFCM() y el README).
  * ================================================================== */
 
 const Notifications = (() => {
-  const scheduled = new Map(); // eventId -> timeoutId
+  let ticker = null;
+  let getTodaysEvents = null; // función provista por la app
+  let moduleUser = null;
 
   function supported() {
     return "Notification" in window && "serviceWorker" in navigator;
+  }
+
+  // ---- Anti-duplicados (por día) ----
+  function todayKey() {
+    const d = new Date();
+    return "agenda.notified." + d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+  }
+  function loadNotified() {
+    try { return new Set(JSON.parse(localStorage.getItem(todayKey()) || "[]")); }
+    catch { return new Set(); }
+  }
+  function saveNotified(set) {
+    try { localStorage.setItem(todayKey(), JSON.stringify([...set])); } catch {}
+  }
+  // Limpia marcas de días anteriores para no acumular basura.
+  function cleanupOldMarks() {
+    try {
+      const keep = todayKey();
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith("agenda.notified.") && k !== keep) localStorage.removeItem(k);
+      }
+    } catch {}
   }
 
   async function requestPermission() {
@@ -49,76 +78,86 @@ const Notifications = (() => {
     }
   }
 
-  // Cancela todos los timers programados.
-  function clearScheduled() {
-    for (const id of scheduled.values()) clearTimeout(id);
-    scheduled.clear();
-  }
+  // Revisa los eventos de hoy y dispara los que ya llegaron a su hora.
+  function check() {
+    if (Notification.permission !== "granted" || !getTodaysEvents) return;
+    const events = getTodaysEvents() || [];
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const notified = loadNotified();
+    let changed = false;
 
-  /*  Programa notificaciones para una lista de eventos de HOY.
-   *  Cada evento: { id, desc, time:"HH:MM", forWho }
-   *  currentUser sirve para personalizar el texto.               */
-  function scheduleForDay(events, currentUser) {
-    clearScheduled();
-    if (Notification.permission !== "granted") return;
-
-    const now = Date.now();
     for (const ev of events) {
       if (!ev.time) continue;
       const [h, m] = ev.time.split(":").map(Number);
-      const when = new Date();
-      when.setHours(h, m, 0, 0);
-      const delay = when.getTime() - now;
+      const evMin = h * 60 + m;
+      const key = ev.id + "@" + ev.time;
 
-      // Solo eventos futuros dentro de las próximas 24h.
-      if (delay <= 0 || delay > 24 * 60 * 60 * 1000) continue;
-
-      const who = ev.forWho === currentUser ? "vos" : ev.forWho;
-      const timeoutId = setTimeout(() => {
+      // Dispara si estamos en el minuto del evento o hasta 2 min después,
+      // y todavía no lo notificamos hoy.
+      if (nowMin >= evMin && nowMin <= evMin + 2 && !notified.has(key)) {
+        const who = ev.forWho === moduleUser ? "vos" : ev.forWho;
         notify(`⏰ ${ev.desc}`, `${ev.time} · para ${who}`, { tag: ev.id });
-        scheduled.delete(ev.id);
-      }, delay);
-      scheduled.set(ev.id, timeoutId);
+        notified.add(key);
+        changed = true;
+      }
     }
+    if (changed) saveNotified(notified);
+  }
+
+  /*  Arranca el ticker de notificaciones.
+   *  getEventsFn: función que devuelve los eventos de HOY, cada uno
+   *  { id, desc, time:"HH:MM", forWho }. user: nombre del usuario actual. */
+  function start(getEventsFn, user) {
+    getTodaysEvents = getEventsFn;
+    moduleUser = user;
+    cleanupOldMarks();
+    if (ticker) clearInterval(ticker);
+    check();
+    ticker = setInterval(check, 30000);
+  }
+
+  // Fuerza una revisión inmediata (al abrir la app, cambios de datos, etc.).
+  function refresh() {
+    check();
   }
 
   /* ================================================================
-   *  FCM (push real) — STUB para completar más adelante.
-   *  Pasos para activarlo (ver README):
-   *   1. Agregar el SDK de messaging en index.html:
-   *      firebase-messaging-compat.js
-   *   2. Poner la VAPID key en firebase-config.js (FCM_VAPID_KEY).
-   *   3. Crear firebase-messaging-sw.js en la raíz.
-   *   4. Descomentar el cuerpo de esta función.
-   *   5. Guardar el token en users/{name}/fcmToken.
-   *   6. Enviar el push desde una Cloud Function programada que
-   *      recorra los eventos y notifique a la hora correspondiente.
+   *  FCM (push real).
+   *  Obtiene el token de este dispositivo y lo guarda en
+   *  users/{name}/tokens/{token}. Una Cloud Function programada
+   *  (functions/index.js) recorre los eventos cada minuto y envía el
+   *  push a la hora correspondiente, aunque la app esté cerrada.
+   *  Requiere: VAPID key en firebase-config.js + firebase-messaging-sw.js.
    * ================================================================ */
-  async function initFCM(_firebaseApp, _db, _userName) {
-    const vapid = window.__FCM_VAPID_KEY__;
-    if (!vapid) return; // FCM no configurado todavía.
+  let fcmReady = false;
 
-    // --- Descomentar cuando se agregue firebase-messaging-compat.js ---
-    // try {
-    //   const messaging = firebase.messaging();
-    //   const reg = await navigator.serviceWorker.ready;
-    //   const token = await messaging.getToken({
-    //     vapidKey: vapid,
-    //     serviceWorkerRegistration: reg,
-    //   });
-    //   if (token) {
-    //     await _db.ref(`users/${_userName}/fcmToken`).set(token);
-    //   }
-    //   messaging.onMessage((payload) => {
-    //     const n = payload.notification || {};
-    //     notify(n.title || "Recordatorio", n.body || "", payload.data || {});
-    //   });
-    // } catch (e) {
-    //   console.warn("FCM no disponible:", e);
-    // }
+  async function initFCM(_firebaseApp, db, userName) {
+    const vapid = self.__FCM_VAPID_KEY__;
+    if (!vapid) return;                       // FCM no configurado.
+    if (fcmReady) return;                      // ya inicializado.
+    if (!supported() || typeof firebase === "undefined" || !firebase.messaging) return;
+    if (Notification.permission !== "granted") return; // necesita permiso.
+
+    try {
+      const messaging = firebase.messaging();
+      // FCM registra automáticamente firebase-messaging-sw.js para el push.
+      const token = await messaging.getToken({ vapidKey: vapid });
+      if (token && db && userName) {
+        await db.ref(`users/${userName}/tokens/${token}`).set(Date.now());
+        fcmReady = true;
+      }
+      // Mensajes en primer plano (app abierta): los mostramos nosotros.
+      messaging.onMessage((payload) => {
+        const n = payload.notification || {};
+        notify(n.title || "Recordatorio", n.body || "", payload.data || {});
+      });
+    } catch (e) {
+      console.warn("FCM no disponible:", e);
+    }
   }
 
-  return { supported, requestPermission, notify, scheduleForDay, clearScheduled, initFCM };
+  return { supported, requestPermission, notify, start, refresh, initFCM };
 })();
 
 window.Notifications = Notifications;

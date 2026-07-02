@@ -170,6 +170,22 @@ body {
   animation: rise .3s ease both;
 }
 .install-btn:active { transform: scale(.99); }
+
+.notif-btn {
+  display: block;
+  width: calc(100% - 40px);
+  margin: 12px 20px 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  animation: rise .3s ease both;
+}
+.notif-btn:active { transform: scale(.99); }
 .ghost-btn {
   border: 1px solid var(--line);
   background: var(--surface);
@@ -455,6 +471,32 @@ body {
 .field input:focus { border-color: var(--accent); background: var(--surface); }
 .field-row { display: flex; gap: 12px; }
 .field-row .field { flex: 1; }
+
+/* Selector de hora en 24 hs (desplegables hora : minutos) */
+.time-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.time-select select {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  border-radius: 12px;
+  padding: 13px 14px;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  text-align-last: center;
+  color: var(--ink);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.time-select select:focus { border-color: var(--accent); background: var(--surface); }
+.time-colon { font-size: 20px; font-weight: 700; color: var(--ink-soft); }
+.time-suffix { font-size: 14px; color: var(--ink-faint); padding-left: 2px; }
 
 .segmented {
   display: flex;
