@@ -38,6 +38,7 @@
     switchUser: $("#switch-user"),
     themeToggle: $("#theme-toggle"),
     themeColorMeta: $("#theme-color-meta"),
+    installBtn: $("#install-btn"),
     prevDay: $("#prev-day"),
     nextDay: $("#next-day"),
     todayBtn: $("#today-btn"),
@@ -506,10 +507,42 @@
   }
 
   // ==================================================================
+  //  Instalación de la PWA
+  // ==================================================================
+  let deferredPrompt = null;
+
+  function setupInstall() {
+    // Chrome/Android dispara este evento cuando la app es instalable.
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      el.installBtn.classList.remove("hidden");
+    });
+
+    el.installBtn.onclick = async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      el.installBtn.classList.add("hidden");
+    };
+
+    // Ya instalada: ocultar el botón.
+    window.addEventListener("appinstalled", () => {
+      deferredPrompt = null;
+      el.installBtn.classList.add("hidden");
+    });
+    if (window.matchMedia("(display-mode: standalone)").matches) {
+      el.installBtn.classList.add("hidden");
+    }
+  }
+
+  // ==================================================================
   //  Arranque
   // ==================================================================
   function main() {
     applyTheme(localStorage.getItem(LS_THEME) === "dark" ? "dark" : "light");
+    setupInstall();
     bindUI();
     registerSW();
     initFirebase();

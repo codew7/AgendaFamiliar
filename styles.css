@@ -153,6 +153,23 @@ body {
 #current-user-name { margin: 2px 0 0; font-size: 24px; letter-spacing: -.4px; }
 
 .header-actions { display: flex; gap: 8px; }
+
+.install-btn {
+  display: block;
+  width: calc(100% - 40px);
+  margin: 14px 20px 0;
+  padding: 13px;
+  border: none;
+  border-radius: 14px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 10px 22px -10px rgba(79, 70, 229, .6);
+  animation: rise .3s ease both;
+}
+.install-btn:active { transform: scale(.99); }
 .ghost-btn {
   border: 1px solid var(--line);
   background: var(--surface);

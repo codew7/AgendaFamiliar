@@ -5,7 +5,7 @@
  *  - Listener de push (stub) listo para FCM
  * ================================================================== */
 
-const CACHE = "agenda-v2";
+const CACHE = "agenda-v3";
 const SHELL = [
   "./",
   "index.html",
@@ -37,7 +37,6 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// Estrategia: network-first para navegación/JS del SDK, cache-first para el shell.
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
@@ -47,12 +46,34 @@ self.addEventListener("fetch", (event) => {
   if (url.hostname.includes("firebaseio.com") || url.hostname.includes("googleapis.com")) {
     return;
   }
+  // Solo manejamos recursos de nuestro propio origen.
+  if (url.origin !== self.location.origin) return;
 
+  // El HTML y el manifest van NETWORK-FIRST: así las actualizaciones
+  // (incluido el manifest para instalar la PWA) llegan enseguida y no
+  // quedan pegadas a una versión vieja del cache.
+  const isDoc = req.mode === "navigate" || url.pathname.endsWith(".html");
+  const isManifest = url.pathname.endsWith("manifest.json");
+
+  if (isDoc || isManifest) {
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy));
+          return res;
+        })
+        .catch(() => caches.match(req))
+    );
+    return;
+  }
+
+  // El resto (CSS, JS, íconos): CACHE-FIRST con revalidación en segundo plano.
   event.respondWith(
     caches.match(req).then((cached) => {
       const fetched = fetch(req)
         .then((res) => {
-          if (res && res.status === 200 && url.origin === self.location.origin) {
+          if (res && res.status === 200) {
             const copy = res.clone();
             caches.open(CACHE).then((c) => c.put(req, copy));
           }

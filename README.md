@@ -87,8 +87,21 @@ También sirve cualquier hosting estático con HTTPS: **Netlify**, **Vercel**,
 ---
 
 ## 4. Instalar como app en el celular
-- **Android (Chrome):** menú ⋮ → *Instalar app* / *Agregar a pantalla de inicio*.
-- **iOS (Safari):** botón *Compartir* → *Agregar a pantalla de inicio*.
+
+Requisitos: servida por **HTTPS** (no sirve `file://` ni `http://IP` local).
+
+- **Android (Chrome):** cuando la app es instalable aparece un botón
+  **"📲 Instalar AgendaFamiliar"** dentro de la app. También podés usar el menú ⋮ →
+  *Instalar app* / *Agregar a pantalla de inicio*.
+- **iOS (Safari):** en iOS **no hay botón automático**: botón *Compartir* →
+  *Agregar a pantalla de inicio*.
+
+> **Importante — el ícono `icon.png` debe ser un PNG cuadrado de 512×512.** Si usás otro
+> tamaño, Chrome puede rechazar la instalación por no coincidir con lo declarado en el
+> manifest.
+>
+> **Tras redeployar:** como la app cachea recursos con un Service Worker, al actualizar
+> puede hacer falta abrir/recargar 1–2 veces para que tome la versión nueva.
 
 ---
 
