@@ -1,1 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+  <meta id="theme-color-meta" name="theme-color" content="#0f172a" />
+  <meta name="description" content="Agenda familiar compartida" />
+  <title>AgendaFamiliar</title>
 
+  <!-- Aplica el tema guardado antes de pintar, para evitar el parpadeo -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("agenda.theme") || "light";
+        document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
+
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icon.png" />
+  <link rel="apple-touch-icon" href="icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="AgendaFamiliar" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="mobile-web-app-capable" content="yes" />
+
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Pantalla de bienvenida / selección de usuario -->
+  <section id="onboarding" class="onboarding hidden">
+    <div class="onboarding-card">
+      <div class="brand">
+        <div class="brand-mark">A</div>
+        <h1>AgendaFamiliar</h1>
+        <p>¿Quién sos?</p>
+      </div>
+      <div class="user-pick">
+        <button class="user-btn" data-user="Vani">
+          <span class="avatar avatar-vani">V</span>
+          <span>Vani</span>
+        </button>
+        <button class="user-btn" data-user="Ale">
+          <span class="avatar avatar-ale">A</span>
+          <span>Ale</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- App principal -->
+  <div id="app" class="app hidden">
+    <!-- AGENDA -->
+    <main id="view-agenda" class="view">
+      <header class="app-header">
+        <div class="header-top">
+          <div>
+            <p class="hello">Hola,</p>
+            <h2 id="current-user-name">—</h2>
+          </div>
+          <div class="header-actions">
+            <button id="theme-toggle" class="ghost-btn" title="Modo nocturno" aria-label="Cambiar tema">🌙</button>
+            <button id="switch-user" class="ghost-btn" title="Cambiar usuario" aria-label="Cambiar usuario">⇄</button>
+          </div>
+        </div>
+
+        <div class="date-nav">
+          <button id="prev-day" class="nav-arrow" aria-label="Día anterior">‹</button>
+          <button id="today-btn" class="date-center">
+            <span id="date-weekday" class="date-weekday">—</span>
+            <span id="date-full" class="date-full">—</span>
+          </button>
+          <button id="next-day" class="nav-arrow" aria-label="Día siguiente">›</button>
+        </div>
+      </header>
+
+      <section class="events-wrap">
+        <ul id="events-list" class="events-list"></ul>
+        <div id="events-empty" class="empty-state hidden">
+          <div class="empty-emoji">🗓️</div>
+          <p>Sin actividades para este día</p>
+          <span>Tocá + para agregar una</span>
+        </div>
+      </section>
+
+      <button id="fab-add" class="fab" aria-label="Agregar actividad">+</button>
+    </main>
+
+    <!-- MENSAJES -->
+    <main id="view-messages" class="view hidden">
+      <header class="app-header compact">
+        <h2>Mensajes</h2>
+        <p class="subtitle">Recordatorios entre Vani y Ale</p>
+      </header>
+      <section id="chat-scroll" class="chat-scroll">
+        <ul id="messages-list" class="messages-list"></ul>
+      </section>
+      <form id="chat-form" class="chat-form">
+        <input id="chat-input" type="text" placeholder="Escribí un mensaje…" autocomplete="off" />
+        <button type="submit" class="chat-send" aria-label="Enviar">➤</button>
+      </form>
+    </main>
+
+    <!-- Navegación inferior -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-view="agenda">
+        <span class="nav-ico">🗓️</span>
+        <span>Agenda</span>
+      </button>
+      <button class="nav-item" data-view="messages">
+        <span class="nav-ico">💬</span>
+        <span>Mensajes</span>
+        <span id="msg-badge" class="badge hidden"></span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- Modal: nueva actividad -->
+  <div id="event-modal" class="modal hidden">
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-sheet">
+      <div class="sheet-handle"></div>
+      <h3 id="modal-title">Nueva actividad</h3>
+      <form id="event-form">
+        <input type="hidden" id="event-id" />
+        <label class="field">
+          <span>Actividad</span>
+          <input id="f-desc" type="text" placeholder="Ej: Retirar a Luján" required maxlength="120" />
+        </label>
+
+        <div class="field-row">
+          <label class="field">
+            <span>Día</span>
+            <input id="f-date" type="date" required />
+          </label>
+          <label class="field">
+            <span>Hora</span>
+            <input id="f-time" type="time" required />
+          </label>
+        </div>
+
+        <div class="field">
+          <span>¿Para quién?</span>
+          <div class="segmented" id="f-for">
+            <button type="button" class="seg" data-for="Vani">Vani</button>
+            <button type="button" class="seg" data-for="Ale">Ale</button>
+          </div>
+        </div>
+
+        <label class="field field-inline">
+          <span>Repetir cada semana</span>
+          <button type="button" id="f-repeat" class="seg seg-toggle">Off</button>
+        </label>
+
+        <div class="modal-actions">
+          <button type="button" id="delete-event" class="danger-btn hidden">Eliminar</button>
+          <button type="submit" class="primary-btn">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Aviso de configuración pendiente de Firebase -->
+  <div id="config-warning" class="config-warning hidden">
+    ⚠️ Falta configurar Firebase. Editá <code>firebase-config.js</code>.
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- Firebase SDK (compat, sin build) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+  <script src="firebase-config.js"></script>
+  <script src="notifications.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

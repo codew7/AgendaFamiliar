@@ -1,0 +1,26 @@
+{
+  "name": "AgendaFamiliar",
+  "short_name": "AgendaFamiliar",
+  "description": "Agenda familiar compartida de actividades diarias",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5f6f8",
+  "theme_color": "#0f172a",
+  "lang": "es-AR",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
