@@ -176,7 +176,8 @@ Firebase pide una tarjeta igual. Activalo en: consola → ⚙ → *Uso y factura
 
 ```
 users/{Vani|Ale}     -> { name, lastSeen, tokens: { <fcmToken>: ts } }
-events/{id}          -> { desc, time:"HH:MM", forWho, createdBy,
+events/{id}          -> { desc, time:"HH:MM", forWho:"Vani|Ale|"",  // "" = para los dos
+                          createdBy,
                           type:"once"|"weekly",
                           date:"YYYY-MM-DD" | null,   // si once
                           weekday:0-6 | null,         // si weekly (0=Dom)

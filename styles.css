@@ -282,6 +282,7 @@ body {
 }
 .for-vani { background: var(--vani-soft); color: var(--vani); }
 .for-ale { background: var(--ale-soft); color: var(--ale); }
+.for-both { background: var(--accent-soft); color: var(--accent); }
 
 .empty-state {
   text-align: center;
@@ -502,6 +503,8 @@ body {
   display: flex;
   gap: 8px;
 }
+.hint { font-style: normal; font-weight: 500; color: var(--ink-soft); opacity: .75; font-size: 12px; }
+
 .seg {
   flex: 1;
   padding: 12px;
@@ -513,6 +516,7 @@ body {
   color: var(--ink-soft);
   cursor: pointer;
 }
+.seg.active[data-for=""] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .seg.active[data-for="Vani"] { background: var(--vani-soft); border-color: var(--vani); color: var(--vani); }
 .seg.active[data-for="Ale"] { background: var(--ale-soft); border-color: var(--ale); color: var(--ale); }
 

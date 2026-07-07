@@ -194,14 +194,17 @@
     el.eventsEmpty.classList.add("hidden");
 
     for (const ev of list) {
+      const who = ev.forWho || "";
+      const forClass = who === "Vani" ? "for-vani" : who === "Ale" ? "for-ale" : "for-both";
+      const forLabel = who ? `para ${escapeHtml(who)}` : "para los dos";
       const li = document.createElement("li");
       li.className = "event-card";
       li.innerHTML = `
         <div class="event-time"><strong>${escapeHtml(ev.time || "--:--")}</strong></div>
         <div class="event-body">
           <span class="event-desc">${escapeHtml(ev.desc || "")}</span>
-          <span class="event-for ${ev.forWho === "Vani" ? "for-vani" : "for-ale"}">
-            para ${escapeHtml(ev.forWho || "")}${ev.type === "weekly" ? " · cada semana" : ""}
+          <span class="event-for ${forClass}">
+            ${forLabel}${ev.type === "weekly" ? " · cada semana" : ""}
           </span>
         </div>`;
       li.onclick = () => openModal(ev);
@@ -272,7 +275,7 @@
       el.fDesc.value = ev.desc || "";
       setModalTime(ev.time);
       el.fDate.value = ev.type === "weekly" ? isoDate(nextWeekdayDate(ev.weekday)) : (ev.date || isoDate(selectedDate));
-      setModalFor(ev.forWho || currentUser);
+      setModalFor(ev.forWho || "");
       setRepeat(ev.type === "weekly");
       el.deleteBtn.classList.remove("hidden");
     } else {
@@ -281,7 +284,7 @@
       el.fId.value = "";
       el.fDate.value = isoDate(selectedDate);
       setModalTime(null);
-      setModalFor(currentUser);
+      setModalFor("");
       setRepeat(false);
       el.deleteBtn.classList.add("hidden");
     }
@@ -322,8 +325,9 @@
     const desc = el.fDesc.value.trim();
     const time = el.fHour.value && el.fMin.value ? `${el.fHour.value}:${el.fMin.value}` : "";
     const dateVal = el.fDate.value;
-    if (!desc || !time || !dateVal || !modalForWho) {
-      toast("Completá todos los campos");
+    // "Para quién" es opcional: vacío ("") significa que es para los dos.
+    if (!desc || !time || !dateVal) {
+      toast("Completá la actividad, el día y la hora");
       return;
     }
 

@@ -96,7 +96,7 @@ const Notifications = (() => {
       // Dispara si estamos en el minuto del evento o hasta 2 min después,
       // y todavía no lo notificamos hoy.
       if (nowMin >= evMin && nowMin <= evMin + 2 && !notified.has(key)) {
-        const who = ev.forWho === moduleUser ? "vos" : ev.forWho;
+        const who = !ev.forWho ? "los dos" : ev.forWho === moduleUser ? "vos" : ev.forWho;
         notify(`⏰ ${ev.desc}`, `${ev.time} · para ${who}`, { tag: ev.id });
         notified.add(key);
         changed = true;
