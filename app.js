@@ -1,11 +1,11 @@
 /* ==================================================================
- *  app.js — Agenda compartida Vani & Ale
+ *  app.js — Agenda compartida Vanina & Alejandro
  * ================================================================== */
 
 (() => {
   "use strict";
 
-  const USERS = ["Vani", "Ale"];
+  const USERS = ["Vanina", "Alejandro"];
   const WEEKDAYS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
   const LS_USER = "agenda.user";
   const LS_LASTREAD = "agenda.lastReadTs";
@@ -39,7 +39,6 @@
     themeToggle: $("#theme-toggle"),
     themeColorMeta: $("#theme-color-meta"),
     installBtn: $("#install-btn"),
-    notifBtn: $("#notif-btn"),
     prevDay: $("#prev-day"),
     nextDay: $("#next-day"),
     todayBtn: $("#today-btn"),
@@ -131,11 +130,7 @@
     if (firebaseReady) {
       db.ref(`users/${currentUser}`).update({ name: currentUser, lastSeen: Date.now() });
       attachListeners();
-      Notifications.initFCM(firebase, db, currentUser);
     }
-    // Arranca el ticker de recordatorios (revisa cada 30s los eventos de hoy).
-    Notifications.start(getTodaysEvents, currentUser);
-    updateNotifBanner();
     renderDate();
     renderEvents();
   }
@@ -148,7 +143,6 @@
       const val = snap.val() || {};
       events = Object.entries(val).map(([id, e]) => ({ id, ...e }));
       renderEvents();
-      scheduleTodayNotifications();
     });
 
     db.ref("messages").on("value", (snap) => {
@@ -195,17 +189,18 @@
 
     for (const ev of list) {
       const who = ev.forWho || "";
-      const forClass = who === "Vani" ? "for-vani" : who === "Ale" ? "for-ale" : "for-both";
-      const forLabel = who ? `para ${escapeHtml(who)}` : "para los dos";
+      const forClass = who === "Vanina" ? "for-vani" : who === "Alejandro" ? "for-ale" : "for-both";
+      const parts = [];
+      if (who) parts.push(`para ${escapeHtml(who)}`);
+      if (ev.type === "weekly") parts.push("cada semana");
+      const forLabel = parts.join(" · ");
       const li = document.createElement("li");
       li.className = "event-card";
       li.innerHTML = `
         <div class="event-time"><strong>${escapeHtml(ev.time || "--:--")}</strong></div>
         <div class="event-body">
           <span class="event-desc">${escapeHtml(ev.desc || "")}</span>
-          <span class="event-for ${forClass}">
-            ${forLabel}${ev.type === "weekly" ? " · cada semana" : ""}
-          </span>
+          ${forLabel ? `<span class="event-for ${forClass}">${forLabel}</span>` : ""}
         </div>`;
       li.onclick = () => openModal(ev);
       el.eventsList.appendChild(li);
@@ -459,60 +454,19 @@
   }
 
   // ==================================================================
-  //  Notificaciones
-  // ==================================================================
-  // Eventos de HOY (puntuales o recurrentes que caen hoy). El ticker de
-  // Notifications llama a esta función en cada revisión.
-  function getTodaysEvents() {
-    const today = new Date();
-    const iso = isoDate(today);
-    const wd = today.getDay();
-    return events.filter((e) =>
-      (e.type === "weekly" && Number(e.weekday) === wd) ||
-      (e.type !== "weekly" && e.date === iso)
-    );
-  }
-
-  function scheduleTodayNotifications() {
-    if (!Notifications.supported()) return;
-    Notifications.refresh();
-  }
-
-  // Muestra u oculta el botón "Activar recordatorios" según el permiso.
-  function updateNotifBanner() {
-    if (!el.notifBtn) return;
-    const show = Notifications.supported() && Notification.permission === "default";
-    el.notifBtn.classList.toggle("hidden", !show);
-  }
-
-  async function ensureNotificationPermission() {
-    const before = Notifications.supported() ? Notification.permission : "unsupported";
-    const res = await Notifications.requestPermission();
-    updateNotifBanner();
-    if (res === "granted") {
-      Notifications.refresh();
-      // Registra el token de push (FCM) para recibir avisos con la app cerrada.
-      if (firebaseReady) Notifications.initFCM(firebase, db, currentUser);
-      // Confirmación solo cuando recién se concede (no en cada clic).
-      if (before === "default") {
-        Notifications.notify("🔔 Recordatorios activados", "Te avisaremos a la hora de cada actividad.");
-      }
-    } else if (res === "denied" && before === "default") {
-      toast("Bloqueaste las notificaciones. Activalas en los ajustes del navegador.");
-    }
-  }
-
-  // ==================================================================
   //  Helpers UI
   // ==================================================================
   // ---- Tema (modo nocturno) ----
+  // Iconos monocromáticos (heredan el color del texto con currentColor).
+  const ICON_MOON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+  const ICON_SUN = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>';
   function currentTheme() {
     return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
   }
   function applyTheme(theme) {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem(LS_THEME, theme);
-    if (el.themeToggle) el.themeToggle.textContent = theme === "dark" ? "☀️" : "🌙";
+    if (el.themeToggle) el.themeToggle.innerHTML = theme === "dark" ? ICON_SUN : ICON_MOON;
     if (el.themeColorMeta) el.themeColorMeta.setAttribute("content", theme === "dark" ? "#0b1120" : "#0f172a");
   }
   function toggleTheme() {
@@ -541,13 +495,12 @@
     el.nextDay.onclick = () => changeDay(1);
     el.todayBtn.onclick = () => { selectedDate = startOfDay(new Date()); renderDate(); renderEvents(); };
 
-    el.fabAdd.onclick = () => { openModal(null); ensureNotificationPermission(); };
+    el.fabAdd.onclick = () => openModal(null);
     el.switchUser.onclick = () => {
       localStorage.removeItem(LS_USER);
       showOnboarding();
     };
     el.themeToggle.onclick = toggleTheme;
-    el.notifBtn.onclick = ensureNotificationPermission;
 
     // Modal
     populateTimeSelects();
@@ -564,11 +517,6 @@
 
     // Nav
     el.navItems.forEach((n) => (n.onclick = () => switchView(n.dataset.view)));
-
-    // Reprogramar notificaciones al volver a foco
-    document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) scheduleTodayNotifications();
-    });
   }
 
   // ==================================================================

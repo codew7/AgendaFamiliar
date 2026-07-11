@@ -37,13 +37,13 @@
         <p>¿Quién sos?</p>
       </div>
       <div class="user-pick">
-        <button class="user-btn" data-user="Vani">
+        <button class="user-btn" data-user="Vanina">
           <span class="avatar avatar-vani">V</span>
-          <span>Vani</span>
+          <span>Vanina</span>
         </button>
-        <button class="user-btn" data-user="Ale">
+        <button class="user-btn" data-user="Alejandro">
           <span class="avatar avatar-ale">A</span>
-          <span>Ale</span>
+          <span>Alejandro</span>
         </button>
       </div>
     </div>
@@ -60,7 +60,7 @@
             <h2 id="current-user-name">—</h2>
           </div>
           <div class="header-actions">
-            <button id="theme-toggle" class="ghost-btn" title="Modo nocturno" aria-label="Cambiar tema">🌙</button>
+            <button id="theme-toggle" class="ghost-btn" title="Modo nocturno" aria-label="Cambiar tema"></button>
             <button id="switch-user" class="ghost-btn" title="Cambiar usuario" aria-label="Cambiar usuario">⇄</button>
           </div>
         </div>
@@ -76,7 +76,6 @@
       </header>
 
       <button id="install-btn" class="install-btn hidden">📲 Instalar AgendaFamiliar</button>
-      <button id="notif-btn" class="notif-btn hidden">🔔 Activar recordatorios</button>
 
       <section class="events-wrap">
         <ul id="events-list" class="events-list"></ul>
@@ -94,7 +93,7 @@
     <main id="view-messages" class="view hidden">
       <header class="app-header compact">
         <h2>Mensajes</h2>
-        <p class="subtitle">Recordatorios entre Vani y Ale</p>
+        <p class="subtitle">Recordatorios entre Vanina y Alejandro</p>
       </header>
       <section id="chat-scroll" class="chat-scroll">
         <ul id="messages-list" class="messages-list"></ul>
@@ -150,9 +149,8 @@
         <div class="field">
           <span>¿Para quién? <em class="hint">(opcional)</em></span>
           <div class="segmented" id="f-for">
-            <button type="button" class="seg" data-for="">Los dos</button>
-            <button type="button" class="seg" data-for="Vani">Vani</button>
-            <button type="button" class="seg" data-for="Ale">Ale</button>
+            <button type="button" class="seg" data-for="Vanina">Vanina</button>
+            <button type="button" class="seg" data-for="Alejandro">Alejandro</button>
           </div>
         </div>
 
@@ -180,10 +178,8 @@
   <!-- Firebase SDK (compat, sin build) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 
   <script src="firebase-config.js"></script>
-  <script src="notifications.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

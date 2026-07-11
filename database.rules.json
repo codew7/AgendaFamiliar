@@ -2,7 +2,6 @@
   "rules": {
     "users": { ".read": true, ".write": true },
     "events": { ".read": true, ".write": true },
-    "messages": { ".read": true, ".write": true },
-    "notified": { ".read": false, ".write": false }
+    "messages": { ".read": true, ".write": true }
   }
 }
