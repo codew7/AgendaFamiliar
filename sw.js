@@ -3,7 +3,7 @@
  *  - Cache offline básico del app shell
  * ================================================================== */
 
-const CACHE = "agenda-v8";
+const CACHE = "agenda-v10";
 const SHELL = [
   "./",
   "index.html",

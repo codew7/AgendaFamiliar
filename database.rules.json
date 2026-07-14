@@ -2,6 +2,8 @@
   "rules": {
     "users": { ".read": true, ".write": true },
     "events": { ".read": true, ".write": true },
-    "messages": { ".read": true, ".write": true }
+    "messages": { ".read": true, ".write": true },
+    "shopping": { ".read": true, ".write": true },
+    "todos": { ".read": true, ".write": true }
   }
 }

@@ -89,6 +89,50 @@
       <button id="fab-add" class="fab" aria-label="Agregar actividad">+</button>
     </main>
 
+    <!-- COMPRAS -->
+    <main id="view-shopping" class="view hidden">
+      <header class="app-header compact">
+        <h2>Compras</h2>
+        <p class="subtitle">Lista del súper compartida</p>
+      </header>
+      <section class="list-scroll">
+        <ul id="shopping-pending" class="list-items"></ul>
+        <div id="shopping-empty" class="empty-state hidden">
+          <div class="empty-emoji">🛒</div>
+          <p>La lista está vacía</p>
+          <span>Agregá lo que haya que comprar</span>
+        </div>
+        <div id="shopping-sep" class="done-sep hidden">Completados</div>
+        <ul id="shopping-done" class="list-items"></ul>
+      </section>
+      <form id="shopping-form" class="add-form" data-list="shopping">
+        <input type="text" placeholder="Agregar un ítem…" autocomplete="off" maxlength="120" />
+        <button type="submit" class="add-send" aria-label="Agregar">+</button>
+      </form>
+    </main>
+
+    <!-- PENDIENTES -->
+    <main id="view-todos" class="view hidden">
+      <header class="app-header compact">
+        <h2>Pendientes</h2>
+        <p class="subtitle">Cosas por hacer, entre los dos</p>
+      </header>
+      <section class="list-scroll">
+        <ul id="todos-pending" class="list-items"></ul>
+        <div id="todos-empty" class="empty-state hidden">
+          <div class="empty-emoji">✅</div>
+          <p>No hay pendientes</p>
+          <span>Agregá algo que haya que hacer</span>
+        </div>
+        <div id="todos-sep" class="done-sep hidden">Completados</div>
+        <ul id="todos-done" class="list-items"></ul>
+      </section>
+      <form id="todos-form" class="add-form" data-list="todos">
+        <input type="text" placeholder="Agregar un pendiente…" autocomplete="off" maxlength="120" />
+        <button type="submit" class="add-send" aria-label="Agregar">+</button>
+      </form>
+    </main>
+
     <!-- MENSAJES -->
     <main id="view-messages" class="view hidden">
       <header class="app-header compact">
@@ -109,6 +153,14 @@
       <button class="nav-item active" data-view="agenda">
         <span class="nav-ico">🗓️</span>
         <span>Agenda</span>
+      </button>
+      <button class="nav-item" data-view="shopping">
+        <span class="nav-ico">🛒</span>
+        <span>Compras</span>
+      </button>
+      <button class="nav-item" data-view="todos">
+        <span class="nav-ico">✅</span>
+        <span>Pendientes</span>
       </button>
       <button class="nav-item" data-view="messages">
         <span class="nav-ico">💬</span>
@@ -162,6 +214,26 @@
         <div class="modal-actions">
           <button type="button" id="delete-event" class="danger-btn hidden">Eliminar</button>
           <button type="submit" class="primary-btn">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: borrar todos los registros de una sección (triple toque en su pestaña) -->
+  <div id="wipe-modal" class="modal hidden">
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-sheet wipe-sheet">
+      <h3>Vaciar <span id="wipe-section">—</span></h3>
+      <p class="wipe-warn">Se van a borrar <strong>todos</strong> los registros de esta sección, para los dos. No se puede deshacer.</p>
+      <form id="wipe-form">
+        <label class="field">
+          <span>Contraseña</span>
+          <input id="wipe-pass" type="password" inputmode="numeric" placeholder="••••••••" autocomplete="off" />
+        </label>
+        <p id="wipe-error" class="wipe-error hidden">Contraseña incorrecta</p>
+        <div class="modal-actions">
+          <button type="button" class="ghost-wide-btn" data-close>Cancelar</button>
+          <button type="submit" class="danger-solid-btn">Borrar todo</button>
         </div>
       </form>
     </div>

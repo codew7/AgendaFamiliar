@@ -19,6 +19,11 @@
   let messages = []; // [{id, from, text, ts}]
   let firebaseReady = false;
 
+  // Listas tipo ToDo (Compras y Pendientes): mismo componente, distinto nodo.
+  const LIST_KEYS = ["shopping", "todos"];
+  const DONE_TTL = 864e5; // los ítems tildados se borran solos a las 24 hs
+  const lists = { shopping: [], todos: [] }; // [{id, text, done, doneAt, order}]
+
   // ---- Utilidades de fecha ----
   function startOfDay(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
   function isoDate(d) {
@@ -58,9 +63,12 @@
     fMin: $("#f-min"),
     fFor: $("#f-for"),
     deleteBtn: $("#delete-event"),
-    // mensajes
+    // vistas
     viewAgenda: $("#view-agenda"),
+    viewShopping: $("#view-shopping"),
+    viewTodos: $("#view-todos"),
     viewMessages: $("#view-messages"),
+    // mensajes
     messagesList: $("#messages-list"),
     chatScroll: $("#chat-scroll"),
     chatForm: $("#chat-form"),
@@ -153,6 +161,15 @@
       renderMessages();
       updateBadge();
     });
+
+    for (const key of LIST_KEYS) {
+      db.ref(key).on("value", (snap) => {
+        const val = snap.val() || {};
+        lists[key] = Object.entries(val).map(([id, it]) => ({ id, ...it }));
+        purgeOldDone(key);
+        renderList(key);
+      });
+    }
   }
 
   // ==================================================================
@@ -373,6 +390,223 @@
   }
 
   // ==================================================================
+  //  Listas tipo ToDo (Compras y Pendientes)
+  //  Un solo componente para las dos: cambia el nodo de Firebase (`key`).
+  // ==================================================================
+  const listCache = {};
+  function listEls(key) {
+    if (!listCache[key]) {
+      const view = key === "shopping" ? el.viewShopping : el.viewTodos;
+      listCache[key] = {
+        view,
+        scroll: view.querySelector(".list-scroll"),
+        pending: $(`#${key}-pending`),
+        done: $(`#${key}-done`),
+        sep: $(`#${key}-sep`),
+        empty: $(`#${key}-empty`),
+        form: $(`#${key}-form`),
+      };
+    }
+    return listCache[key];
+  }
+
+  // Un ítem tildado hace más de 24 hs ya no se muestra, aunque el borrado
+  // en el servidor todavía no haya ocurrido.
+  function isExpired(it) {
+    return !!it.done && !!it.doneAt && Date.now() - it.doneAt > DONE_TTL;
+  }
+
+  // Borra del servidor los tildados que superaron las 24 hs.
+  function purgeOldDone(key) {
+    if (!firebaseReady) return;
+    const old = lists[key].filter(isExpired);
+    for (const it of old) {
+      db.ref(`${key}/${it.id}`).remove().catch((e) => console.warn("No se pudo purgar:", e));
+    }
+  }
+
+  function renderList(key) {
+    const els = listEls(key);
+    const visible = lists[key].filter((it) => !isExpired(it));
+    const pending = visible
+      .filter((it) => !it.done)
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+    const done = visible
+      .filter((it) => it.done)
+      .sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
+
+    els.pending.innerHTML = "";
+    els.done.innerHTML = "";
+    for (const it of pending) els.pending.appendChild(itemNode(key, it));
+    for (const it of done) els.done.appendChild(itemNode(key, it));
+
+    els.sep.classList.toggle("hidden", done.length === 0);
+    els.empty.classList.toggle("hidden", visible.length > 0);
+  }
+
+  function itemNode(key, it) {
+    const li = document.createElement("li");
+    li.className = `list-item${it.done ? " is-done" : ""}`;
+    li.dataset.id = it.id;
+    li.innerHTML = `
+      <span class="list-drag" aria-hidden="true">⠿</span>
+      <label class="list-check-wrap">
+        <input type="checkbox" class="list-check" ${it.done ? "checked" : ""} aria-label="Marcar como hecho" />
+      </label>
+      <span class="list-text">${escapeHtml(it.text || "")}</span>
+      <button type="button" class="list-del" aria-label="Eliminar">🗑</button>`;
+
+    li.querySelector(".list-check").onchange = () => toggleItem(key, it);
+    li.querySelector(".list-del").onclick = () => removeItem(key, it.id);
+    if (!it.done) {
+      li.querySelector(".list-drag").addEventListener("pointerdown", (e) => startDrag(e, key, li));
+    }
+    return li;
+  }
+
+  async function addItem(key, text) {
+    if (!firebaseReady) { toast("Configurá Firebase primero"); return; }
+    const orders = lists[key].filter((it) => !it.done).map((it) => it.order || 0);
+    const order = orders.length ? Math.max(...orders) + 1 : 0;
+    try {
+      await db.ref(key).push({
+        text,
+        done: false,
+        doneAt: null,
+        order,
+        createdBy: currentUser,
+        createdAt: Date.now(),
+      });
+    } catch (err) {
+      console.error(err);
+      toast("No se pudo agregar");
+    }
+  }
+
+  async function toggleItem(key, it) {
+    if (!firebaseReady) return;
+    try {
+      await db.ref(`${key}/${it.id}`).update({
+        done: !it.done,
+        doneAt: it.done ? null : Date.now(),
+      });
+    } catch (err) {
+      console.error(err);
+      toast("No se pudo actualizar");
+      renderList(key); // el checkbox ya cambió en pantalla: lo devolvemos a su estado real
+    }
+  }
+
+  async function removeItem(key, id) {
+    if (!firebaseReady) return;
+    try {
+      await db.ref(`${key}/${id}`).remove();
+    } catch (err) {
+      console.error(err);
+      toast("No se pudo eliminar");
+    }
+  }
+
+  // ---- Reorden manual por arrastre (mouse y dedo, vía Pointer Events) ----
+  let drag = null; // { key, li, ul, startY, lastY, raf }
+
+  // Los listeners van en `window` a propósito: al reordenar movemos el <li> con
+  // insertBefore, y eso libera la captura del puntero sobre la manija (se pierde
+  // el pointerup y el arrastre queda colgado). `window` no se ve afectado.
+  function startDrag(e, key, li) {
+    if (drag) return;
+    e.preventDefault();
+    const ul = li.parentElement;
+    drag = { key, li, ul, startY: e.clientY, lastY: e.clientY, raf: null };
+    li.classList.add("dragging");
+    window.addEventListener("pointermove", onDragMove, { passive: false });
+    window.addEventListener("pointerup", endDrag);
+    window.addEventListener("pointercancel", endDrag);
+    drag.raf = requestAnimationFrame(autoScrollTick);
+  }
+
+  function onDragMove(e) {
+    if (!drag) return;
+    e.preventDefault();
+    drag.lastY = e.clientY;
+    applyDrag();
+  }
+
+  function applyDrag() {
+    const { li, ul, startY, lastY } = drag;
+    li.style.transform = `translateY(${lastY - startY}px)`;
+
+    // Punto de inserción: antes del primer hermano cuyo centro quede por
+    // debajo del centro de la fila que estamos arrastrando.
+    const r = li.getBoundingClientRect();
+    const center = r.top + r.height / 2;
+    let ref = null;
+    for (const n of ul.children) {
+      if (n === li) continue;
+      const nr = n.getBoundingClientRect();
+      if (center < nr.top + nr.height / 2) { ref = n; break; }
+    }
+    if (ref === li.nextElementSibling) return; // ya está en su lugar
+
+    // Al mover el nodo cambia su posición de layout; corregimos la referencia
+    // para que la fila no pegue un salto bajo el dedo.
+    const before = li.getBoundingClientRect().top;
+    ul.insertBefore(li, ref);
+    const after = li.getBoundingClientRect().top;
+    drag.startY += after - before;
+    li.style.transform = `translateY(${drag.lastY - drag.startY}px)`;
+  }
+
+  // Acerca la fila al borde del área scrolleable y la lista se desplaza sola.
+  function autoScrollTick() {
+    if (!drag) return;
+    const sc = listEls(drag.key).scroll;
+    const r = sc.getBoundingClientRect();
+    const EDGE = 56;
+    let dv = 0;
+    if (drag.lastY < r.top + EDGE) dv = -10 * ((r.top + EDGE - drag.lastY) / EDGE);
+    else if (drag.lastY > r.bottom - EDGE) dv = 10 * ((drag.lastY - (r.bottom - EDGE)) / EDGE);
+
+    if (dv) {
+      const prev = sc.scrollTop;
+      sc.scrollTop += dv;
+      const moved = sc.scrollTop - prev;
+      if (moved) {
+        drag.startY -= moved; // la fila sigue pegada al dedo mientras la lista se desplaza
+        applyDrag();
+      }
+    }
+    drag.raf = requestAnimationFrame(autoScrollTick);
+  }
+
+  function endDrag() {
+    if (!drag) return;
+    const { key, li, ul, raf } = drag;
+    cancelAnimationFrame(raf);
+    window.removeEventListener("pointermove", onDragMove);
+    window.removeEventListener("pointerup", endDrag);
+    window.removeEventListener("pointercancel", endDrag);
+    li.style.transform = "";
+    li.classList.remove("dragging");
+    drag = null;
+    persistOrder(key, ul);
+  }
+
+  // Reescribe el `order` de los pendientes según cómo quedaron en pantalla,
+  // en una única escritura multi-path (atómica).
+  function persistOrder(key, ul) {
+    if (!firebaseReady) return;
+    const updates = {};
+    [...ul.children].forEach((n, i) => { updates[`${n.dataset.id}/order`] = i; });
+    if (!Object.keys(updates).length) return;
+    db.ref(key).update(updates).catch((err) => {
+      console.error(err);
+      toast("No se pudo guardar el orden");
+      renderList(key);
+    });
+  }
+
+  // ==================================================================
   //  Mensajería
   // ==================================================================
   function renderMessages() {
@@ -443,13 +677,86 @@
   //  Navegación entre vistas
   // ==================================================================
   function switchView(view) {
-    const isMsg = view === "messages";
-    el.viewAgenda.classList.toggle("hidden", isMsg);
-    el.viewMessages.classList.toggle("hidden", !isMsg);
+    const views = {
+      agenda: el.viewAgenda,
+      shopping: el.viewShopping,
+      todos: el.viewTodos,
+      messages: el.viewMessages,
+    };
+    Object.entries(views).forEach(([name, node]) => node.classList.toggle("hidden", name !== view));
     el.navItems.forEach((n) => n.classList.toggle("active", n.dataset.view === view));
-    if (isMsg) {
+    if (view === "messages") {
       renderMessages();
       markRead();
+    }
+  }
+
+  // ==================================================================
+  //  Vaciar una sección (3 toques seguidos en su pestaña + contraseña)
+  // ==================================================================
+  const WIPE_PASS = "47623212";
+  const WIPE_TAPS = 3;
+  const WIPE_WINDOW = 700; // ms entre toque y toque
+  const WIPE_TARGET = {
+    agenda:   { node: "events",   label: "la Agenda" },
+    shopping: { node: "shopping", label: "Compras" },
+    todos:    { node: "todos",    label: "Pendientes" },
+    messages: { node: "messages", label: "Mensajes" },
+  };
+
+  let tapView = null;
+  let tapCount = 0;
+  let tapTimer = null;
+  let wipeView = null;
+
+  function registerTap(view) {
+    if (view !== tapView) { tapView = view; tapCount = 0; }
+    tapCount++;
+    clearTimeout(tapTimer);
+    tapTimer = setTimeout(() => { tapCount = 0; tapView = null; }, WIPE_WINDOW);
+    if (tapCount >= WIPE_TAPS) {
+      clearTimeout(tapTimer);
+      tapCount = 0;
+      tapView = null;
+      openWipeModal(view);
+    }
+  }
+
+  function openWipeModal(view) {
+    if (!WIPE_TARGET[view]) return;
+    wipeView = view;
+    $("#wipe-section").textContent = WIPE_TARGET[view].label;
+    $("#wipe-pass").value = "";
+    $("#wipe-error").classList.add("hidden");
+    $("#wipe-modal").classList.remove("hidden");
+    setTimeout(() => $("#wipe-pass").focus(), 150);
+  }
+
+  function closeWipeModal() {
+    $("#wipe-modal").classList.add("hidden");
+    wipeView = null;
+  }
+
+  async function confirmWipe(e) {
+    e.preventDefault();
+    const sheet = $("#wipe-modal .modal-sheet");
+    if ($("#wipe-pass").value !== WIPE_PASS) {
+      $("#wipe-error").classList.remove("hidden");
+      $("#wipe-pass").value = "";
+      sheet.classList.remove("shake");
+      void sheet.offsetWidth; // reinicia la animación
+      sheet.classList.add("shake");
+      return;
+    }
+    if (!firebaseReady || !wipeView) return;
+    const { node, label } = WIPE_TARGET[wipeView];
+    try {
+      await db.ref(node).remove();
+      closeWipeModal();
+      toast(`Se vació ${label}`);
+    } catch (err) {
+      console.error(err);
+      toast("No se pudo borrar");
     }
   }
 
@@ -515,8 +822,28 @@
     // Mensajería
     el.chatForm.onsubmit = sendMessage;
 
-    // Nav
-    el.navItems.forEach((n) => (n.onclick = () => switchView(n.dataset.view)));
+    // Listas (Compras y Pendientes)
+    for (const key of LIST_KEYS) {
+      const form = listEls(key).form;
+      form.onsubmit = (e) => {
+        e.preventDefault();
+        const input = form.querySelector("input");
+        const text = input.value.trim();
+        if (!text) return;
+        input.value = "";
+        addItem(key, text);
+      };
+    }
+
+    // Nav (3 toques seguidos en una pestaña ofrecen vaciar esa sección)
+    el.navItems.forEach((n) => (n.onclick = () => {
+      switchView(n.dataset.view);
+      registerTap(n.dataset.view);
+    }));
+
+    // Modal de vaciado
+    $("#wipe-form").onsubmit = confirmWipe;
+    $("#wipe-modal").querySelectorAll("[data-close]").forEach((n) => (n.onclick = closeWipeModal));
   }
 
   // ==================================================================
@@ -571,6 +898,14 @@
     registerSW();
     initFirebase();
     loadUser();
+
+    // Con la app abierta, los tildados también se vencen solos a las 24 hs.
+    setInterval(() => {
+      for (const key of LIST_KEYS) {
+        purgeOldDone(key);
+        renderList(key);
+      }
+    }, 3e5);
   }
 
   document.addEventListener("DOMContentLoaded", main);
